@@ -7,6 +7,7 @@ import schedule
 import argparse
 import json
 import traceback 
+import math
 from datetime import datetime, timedelta
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -1875,8 +1876,11 @@ def place_partial_take_profits(symbol, side, quantity, entry_price, position_inf
         if i == len(take_profit_levels) - 1:
             level_qty = remaining_qty
         else:
-            # Calculate quantity for this level
+            # Calculate quantity for this level with improved precision handling
             level_qty = round_quantity(quantity * tp_level['percentage'], symbol)
+            # Ensure we don't exceed the total quantity with rounding errors
+            if level_qty > remaining_qty:
+                level_qty = remaining_qty
             remaining_qty -= level_qty
         
         if level_qty <= 0:
@@ -2006,7 +2010,12 @@ def round_quantity(quantity, symbol):
         symbol_info = binance_client.get_symbol_info(symbol)
         if symbol_info and 'quantity_precision' in symbol_info:
             precision = symbol_info['quantity_precision']
-            return round(quantity, precision)
+            # Use floor instead of round to ensure we don't exceed allowed precision
+            # Convert to string with proper precision to avoid floating point errors
+            return float('{:.{prec}f}'.format(
+                math.floor(quantity * 10**precision) / 10**precision, 
+                prec=precision
+            ))
         return quantity  # Return as is if we couldn't get precision
     except Exception as e:
         logger.warning(f"Error rounding quantity: {e}")
